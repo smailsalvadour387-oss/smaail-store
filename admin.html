@@ -1,0 +1,26 @@
+<!doctype html><html lang="ar" dir="rtl"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SMAAIL STORE — Admin</title>
+<style>body{font-family:Arial;margin:0;background:#f5f5f5;color:#111}.wrap{max-width:900px;margin:auto;padding:18px}.box{background:#fff;border:1px solid #ddd;border-radius:15px;padding:18px;margin:12px 0}input,textarea,select{width:100%;padding:11px;margin:6px 0 12px;border:1px solid #ddd;border-radius:9px;box-sizing:border-box}.btn{padding:11px 15px;border:0;border-radius:9px;cursor:pointer;font-weight:700}.dark{background:#111;color:#fff}.gold{background:#e5b93f}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.item{display:flex;justify-content:space-between;gap:10px;border-top:1px solid #eee;padding:12px 0}.danger{background:#c33;color:#fff}@media(max-width:600px){.row{grid-template-columns:1fr}.item{display:block}}</style>
+</head><body><div class="wrap">
+<h1>SMAAIL STORE — لوحة التحكم</h1>
+<div id="login" class="box"><h2>دخول الإدارة</h2><input id="email" type="email" placeholder="Email"><input id="pass" type="password" placeholder="Password"><button class="btn dark" onclick="login()">دخول</button><p id="msg"></p></div>
+<div id="app" style="display:none">
+<div class="box"><button class="btn dark" onclick="logout()">خروج</button></div>
+<div class="box"><h2>إضافة / تعديل منتج</h2><input type="hidden" id="pid"><label>الاسم بالعربية</label><input id="ar"><label>Nom en français</label><input id="fr"><div class="row"><div><label>الثمن DH</label><input id="price" type="number" step="0.01"></div><div><label>رابط الصورة</label><input id="image"></div></div><label>الوصف</label><textarea id="desc"></textarea><label><input id="active" type="checkbox" checked style="width:auto"> ظاهر في المتجر</label><button class="btn gold" onclick="save()">حفظ المنتج</button> <button class="btn" onclick="clearForm()">جديد</button></div>
+<div class="box"><h2>المنتجات</h2><div id="products"></div></div>
+<div class="box"><h2>الطلبات</h2><div id="orders"></div></div>
+</div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script>
+<script>
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);const $=x=>document.getElementById(x);
+async function check(){const {data}=await sb.auth.getSession();if(data.session){$("login").style.display="none";$("app").style.display="block";load()}else{$("login").style.display="block";$("app").style.display="none"}}
+async function login(){const {error}=await sb.auth.signInWithPassword({email:$("email").value,password:$("pass").value});$("msg").textContent=error?error.message:"";if(!error)check()}
+async function logout(){await sb.auth.signOut();check()}
+async function load(){let p=await sb.from("products").select("*").order("created_at",{ascending:false});$("products").innerHTML=(p.data||[]).map(x=>`<div class="item"><div><b>${x.name_ar}</b> — ${x.price} DH<br><small>${x.active?"ظاهر":"مخفي"}</small></div><div><button class="btn" onclick='edit(${JSON.stringify(x)})'>تعديل</button> <button class="btn danger" onclick="del('${x.id}')">حذف</button></div></div>`).join("");let o=await sb.from("orders").select("*").order("created_at",{ascending:false});$("orders").innerHTML=(o.data||[]).map(x=>`<div class="item"><div><b>${x.customer_name}</b> — ${x.total} DH<br>${x.phone} · ${x.city}<br><small>${new Date(x.created_at).toLocaleString()}</small></div><div><select onchange="status('${x.id}',this.value)"><option ${x.status==="new"?"selected":""}>new</option><option ${x.status==="confirmed"?"selected":""}>confirmed</option><option ${x.status==="shipped"?"selected":""}>shipped</option><option ${x.status==="delivered"?"selected":""}>delivered</option><option ${x.status==="cancelled"?"selected":""}>cancelled</option></select></div></div>`).join("")}
+function edit(x){$("pid").value=x.id;$("ar").value=x.name_ar;$("fr").value=x.name_fr;$("price").value=x.price;$("image").value=x.image_url||"";$("desc").value=x.description||"";$("active").checked=x.active;scrollTo(0,0)}
+function clearForm(){["pid","ar","fr","price","image","desc"].forEach(id=>$(id).value="");$("active").checked=true}
+async function save(){let obj={name_ar:$("ar").value,name_fr:$("fr").value,price:Number($("price").value),image_url:$("image").value||null,description:$("desc").value,active:$("active").checked};let q=$("pid").value?sb.from("products").update(obj).eq("id",$("pid").value):sb.from("products").insert(obj);let {error}=await q;if(error)alert(error.message);else{clearForm();load()}}
+async function del(id){if(!confirm("حذف المنتج؟"))return;await sb.from("products").delete().eq("id",id);load()}
+async function status(id,s){await sb.from("orders").update({status:s}).eq("id",id);load()}
+check();
+</script></body></html>
